@@ -1,0 +1,23 @@
+{
+  "name": "tessera-works-bot",
+  "version": "1.0.0",
+  "description": "Tessera Works: a polyomino puzzle-building board game you play inside Discord",
+  "main": "src/bot.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "start": "node --env-file=.env src/bot.js",
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.65",
+    "discord.js": "^14.28.1"
+  },
+  "engines": {
+    "node": ">=20.6"
+  }
+}
