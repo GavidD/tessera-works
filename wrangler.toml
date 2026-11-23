@@ -1,0 +1,22 @@
+# Cloudflare Worker: Activity backend (sign-in + multiplayer rooms) and, optionally, the client files.
+name = "tessera-works"
+main = "worker/index.js"
+compatibility_date = "2025-09-01"
+
+[vars]
+DISCORD_CLIENT_ID = "1574218234792517723"
+# DISCORD_CLIENT_SECRET is a secret: set it with `npx wrangler secret put DISCORD_CLIENT_SECRET`
+# (the GitHub workflow does this for you from the repo secret of the same name).
+
+[assets]
+directory = "./activity/dist"
+binding = "ASSETS"
+run_worker_first = ["/api/*", "/.proxy/api/*", "/token", "/ws", "/health"]
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]

@@ -5,7 +5,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
-const { Game, GameError } = require('./engine/game');
+const { applyMessage, publicState, exchangeCode: exchange, whoAmI, GameError } = require('./rooms');
 
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
@@ -31,22 +31,7 @@ function readBody(req, limit = 4096) {
   });
 }
 
-async function exchangeCode(code) {
-  const r = await fetch('https://discord.com/api/oauth2/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: CLIENT_ID, client_secret: CLIENT_SECRET, grant_type: 'authorization_code', code }),
-  });
-  if (!r.ok) throw new Error(`token exchange failed (${r.status})`);
-  return (await r.json()).access_token;
-}
-
-async function whoAmI(accessToken) {
-  const r = await fetch('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${accessToken}` } });
-  if (!r.ok) throw new Error('invalid access token');
-  const u = await r.json();
-  return { id: u.id, name: u.global_name || u.username };
-}
+const exchangeCode = code => exchange(code, CLIENT_ID, CLIENT_SECRET);
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 function serveStatic(req, res) {
@@ -62,13 +47,6 @@ function serveStatic(req, res) {
 }
 
 // ---------- rooms ----------
-function publicState(game) {
-  if (!game) return null;
-  const s = JSON.parse(JSON.stringify(game));
-  if (s.decks) s.decks = { bronze: s.decks.bronze.length, gold: s.decks.gold.length }; // hide deck order
-  return s;
-}
-
 function broadcast(room, extra = {}) {
   room.touched = Date.now();
   const state = publicState(room.game);
@@ -80,43 +58,9 @@ const onlineIds = room => [...new Set([...room.clients].map(c => c.user.id))];
 
 function handleMessage(ws, msg) {
   const room = rooms.get(ws.instance);
-  const u = ws.user;
-  const g = room.game;
-  switch (msg.t) {
-    case 'join':
-      if (!g || g.phase === 'ended') room.game = new Game({ channelId: ws.instance, hostId: u.id, hostName: u.name });
-      else g.addPlayer(u.id, u.name);
-      break;
-    case 'leave':
-      if (!g) return;
-      if (g.hostId === u.id && g.phase === 'lobby') room.game = null;
-      else g.removePlayer(u.id);
-      break;
-    case 'start':
-      if (!g || g.hostId !== u.id) throw new GameError('Only the host can start.');
-      g.start();
-      break;
-    case 'act': {
-      if (!g) throw new GameError('No game yet.');
-      const a = msg.args || {};
-      let done = [];
-      if (msg.action === 'draw') g.draw(u.id);
-      else if (msg.action === 'refine') g.refine(u.id, a.from, a.to);
-      else if (msg.action === 'commission') g.commission(u.id, a.tier, a.slot === 'deck' ? 'deck' : Number(a.slot));
-      else if (msg.action === 'fit') done = g.fit(u.id, Number(a.puzzleIdx), a.pieceId, a.cells);
-      else if (msg.action === 'flurry') done = g.flurry(u.id, a.placements || []);
-      else if (msg.action === 'endTurn') g.endTurn(u.id);
-      else throw new GameError('Unknown action.');
-      return broadcast(room, done.length ? { event: { kind: 'complete', who: u.id, puzzles: done } } : {});
-    }
-    case 'abandon':
-      if (!g || g.hostId !== u.id) throw new GameError('Only the host can end the game.');
-      if (g.phase === 'playing') g.forceEnd(); else room.game = null;
-      break;
-    default:
-      return;
-  }
-  broadcast(room);
+  const { game, event } = applyMessage(room.game, ws.user, msg, ws.instance);
+  room.game = game;
+  broadcast(room, event ? { event } : {});
 }
 
 function validMessage(m) {

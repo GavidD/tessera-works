@@ -1,0 +1,36 @@
+name: Deploy Activity backend to Cloudflare
+
+on:
+  push:
+    branches: [main]
+    paths: ['worker/**', 'src/engine/**', 'src/rooms.js', 'activity/**', 'wrangler.toml', 'package*.json', 'scripts/build-activity.js', '.github/workflows/worker.yml']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HAS_CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+    steps:
+      - name: Skip until Cloudflare secrets are configured
+        if: env.HAS_CF_TOKEN != 'true'
+        run: echo "::notice::Add the CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID and DISCORD_CLIENT_SECRET repo secrets to enable deployment (see README)."
+      - uses: actions/checkout@v4
+        if: env.HAS_CF_TOKEN == 'true'
+      - uses: actions/setup-node@v4
+        if: env.HAS_CF_TOKEN == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - if: env.HAS_CF_TOKEN == 'true'
+        run: npm ci && npm test && npm run build:activity
+      - uses: cloudflare/wrangler-action@v3
+        if: env.HAS_CF_TOKEN == 'true'
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.166.0"
+          secrets: |
+            DISCORD_CLIENT_SECRET
+        env:
+          DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}

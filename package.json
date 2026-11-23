@@ -11,7 +11,9 @@
     "test": "node --test test/*.test.js",
     "server": "node --env-file=.env src/server.js",
     "build:activity": "node scripts/build-activity.js",
-    "dev:activity": "node scripts/build-activity.js && ACTIVITY_DEV_AUTH=1 ACTIVITY_STATIC_DIR=activity/dist node src/server.js"
+    "dev:activity": "node scripts/build-activity.js && ACTIVITY_DEV_AUTH=1 ACTIVITY_STATIC_DIR=activity/dist node src/server.js",
+    "dev:worker": "node scripts/build-activity.js && wrangler dev",
+    "deploy:worker": "node scripts/build-activity.js && wrangler deploy"
   },
   "keywords": [],
   "author": "",
@@ -26,6 +28,7 @@
     "node": ">=20.6"
   },
   "devDependencies": {
-    "esbuild": "^0.25.10"
+    "esbuild": "^0.25.10",
+    "wrangler": "^4.166.0"
   }
 }

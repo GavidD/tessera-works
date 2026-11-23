@@ -74,24 +74,24 @@ Everyone in the voice channel sees the same live board. You pick up a tile, see 
 
 ![Activity](docs/activity.png)
 
-It has two parts:
+It has two parts, and neither needs a server of your own:
 
 | Part | Hosted on | What it does |
 |---|---|---|
-| Web client (`activity/`) | **GitHub Pages**, deployed by `.github/workflows/pages.yml` on every push to `main` | The board UI |
-| Server (`src/server.js`) | Anywhere with a **public HTTPS** address. It starts automatically with `npm start` when `DISCORD_CLIENT_SECRET` is set | Discord sign-in (code → token) and live multiplayer rooms over WebSocket, one room per Activity instance |
+| Web client (`activity/`) | **GitHub Pages**, deployed by `.github/workflows/pages.yml` | The board UI |
+| Backend (`worker/`) | **Cloudflare Workers + Durable Objects** (free plan), deployed by `.github/workflows/worker.yml` | Discord sign-in (code → token) and live multiplayer: one Durable Object per Activity instance, with state saved so a room survives restarts |
 
 ### Setup
 
-1. **GitHub Pages**: in the repo, go to Settings → Pages → Source and choose **GitHub Actions**. Push to `main`, and the site appears at `https://<you>.github.io/<repo>/`.
-2. **Server**: add these to `.env`, then run `npm start` on a host with HTTPS (Railway, Render, Fly.io, a VPS behind Caddy, or `cloudflared tunnel --url http://localhost:3001` for testing):
-   ```
-   DISCORD_CLIENT_ID=<your application id>
-   DISCORD_CLIENT_SECRET=<OAuth2 client secret>
-   PORT=3001
-   ```
-   Check it with `https://<server>/health`.
-3. **Developer Portal**:
+1. **GitHub Pages**: Settings → Pages → Source → **GitHub Actions**. The site is `https://<you>.github.io/<repo>/`.
+2. **Cloudflare API token**: in the Cloudflare dashboard, go to My Profile → API Tokens → Create Token and use the **Edit Cloudflare Workers** template. Copy your **Account ID** from the Workers & Pages overview page.
+3. **GitHub repo secrets** (Settings → Secrets and variables → Actions → New repository secret):
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+   - `DISCORD_CLIENT_SECRET`: from Discord Developer Portal → OAuth2
+4. **Deploy**: run the **Deploy Activity backend to Cloudflare** workflow (Actions tab → Run workflow), or push to `main`. The Worker appears at `https://tessera-works.<your-subdomain>.workers.dev`. Check it with `/health`.
+   *Optional:* to use your own domain, open the Worker in the Cloudflare dashboard, go to Settings → Domains & Routes and add a custom domain such as `tessera.yourdomain.com`.
+5. **Discord Developer Portal**:
    - **OAuth2**: add a redirect such as `https://127.0.0.1`. It isn't used, but the form requires one.
    - **Activities → Settings**: turn Activities on.
    - **Activities → URL Mappings**:
@@ -99,20 +99,27 @@ It has two parts:
      | Prefix | Target |
      |---|---|
      | `/` | `<you>.github.io/<repo>` |
-     | `/api` | `<your server host>` |
+     | `/api` | `tessera-works.<your-subdomain>.workers.dev` (or your custom domain) |
 
-4. Join a voice channel and launch it from the 🚀 Activities button. Unpublished apps are only visible to you and to the **App Testers** you add.
+     The Worker also serves the client files, so mapping only `/` → the Worker host works too, without Pages.
+6. Join a voice channel and launch it from the 🚀 Activities button. Unpublished apps are only visible to you and to the **App Testers** you add.
 
-If you use a different Discord app, put its ID in `activity/config.json`.
+If you use a different Discord app, change the client ID in `activity/config.json` and `wrangler.toml`.
+
+The Node server in `src/server.js` does the same job as the Worker if you'd rather self-host. `npm start` runs it alongside the chat bot when `DISCORD_CLIENT_SECRET` is in `.env`.
 
 ### Local testing without Discord
 
 ```bash
-npm run dev:activity
+echo ACTIVITY_DEV_AUTH=1 > .dev.vars
 ```
 
-Open `http://localhost:3001/?dev=Alice` and `http://localhost:3001/?dev=Bob` in two windows. Add `&room=xyz` to use separate rooms.
-`ACTIVITY_DEV_AUTH=1` lets anyone choose a name without signing in, so **never set it on a public server**.
+```bash
+npm run dev:worker
+```
+
+Open `http://127.0.0.1:8787/?dev=Alice` and `http://127.0.0.1:8787/?dev=Bob` in two windows. Add `&room=xyz` for separate rooms.
+`ACTIVITY_DEV_AUTH=1` lets anyone pick a name without signing in. It only lives in the git-ignored `.dev.vars` file, so **never set it on the deployed Worker**.
 
 ## Development
 
@@ -129,7 +136,9 @@ src/engine/game.js     rules engine (pure, no Discord dependency)
 src/render.js          PNG rendering with @napi-rs/canvas
 src/bot.js             Discord commands, panels and interaction flow
 src/rules.js           rules text shown in Discord
-src/server.js          Activity backend (OAuth exchange + WebSocket game rooms)
+src/rooms.js           shared Activity room logic (used by the Worker and the Node server)
+worker/index.js        Cloudflare Worker + Durable Object Activity backend
+src/server.js          the same backend as a plain Node server, for self-hosting
 activity/              Activity web client (built with esbuild into activity/dist)
 ```
 

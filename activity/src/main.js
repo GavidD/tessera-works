@@ -47,14 +47,15 @@ async function discordAuth() {
   const body = await r.json();
   if (!r.ok) throw new Error(body.error || 'token exchange failed');
   await sdk.commands.authenticate({ access_token: body.access_token });
-  return { hello: { t: 'hello', token: body.access_token, instance: sdk.instanceId }, url: `wss://${location.host}/.proxy/api/ws` };
+  return { hello: { t: 'hello', token: body.access_token, instance: sdk.instanceId }, url: `wss://${location.host}/.proxy/api/ws?instance=${encodeURIComponent(sdk.instanceId)}` };
 }
 
 function devAuth() {
   const name = params.get('dev') || `guest${Math.floor(Math.random() * 1000)}`;
   const server = params.get('server') || location.host;
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  return { hello: { t: 'hello', dev: name, instance: params.get('room') || 'dev-room' }, url: `${proto}://${server}/api/ws` };
+  const room = params.get('room') || 'dev-room';
+  return { hello: { t: 'hello', dev: name, instance: room }, url: `${proto}://${server}/api/ws?instance=${encodeURIComponent(room)}` };
 }
 
 let auth = null, retry = 0;
