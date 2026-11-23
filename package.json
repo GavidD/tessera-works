@@ -8,16 +8,24 @@
   },
   "scripts": {
     "start": "node --env-file=.env src/bot.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "server": "node --env-file=.env src/server.js",
+    "build:activity": "node scripts/build-activity.js",
+    "dev:activity": "node scripts/build-activity.js && ACTIVITY_DEV_AUTH=1 ACTIVITY_STATIC_DIR=activity/dist node src/server.js"
   },
   "keywords": [],
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@discord/embedded-app-sdk": "^2.5.0",
     "@napi-rs/canvas": "^0.1.65",
-    "discord.js": "^14.28.1"
+    "discord.js": "^14.28.1",
+    "ws": "^8.23.0"
   },
   "engines": {
     "node": ">=20.6"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10"
   }
 }

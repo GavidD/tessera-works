@@ -427,6 +427,8 @@ const command = new SlashCommandBuilder().setName('tessera').setDescription('Tes
 
 async function main() {
   if (!TOKEN) { console.error('Set DISCORD_TOKEN (see README).'); process.exit(1); }
+  if (process.env.DISCORD_CLIENT_SECRET) await require('./server').startServer(); // Activity backend
+  else console.log('DISCORD_CLIENT_SECRET not set: Activity server disabled (chat bot only).');
   load();
   const client = new Client({ intents: [GatewayIntentBits.Guilds] });
   client.once(Events.ClientReady, async c => {
